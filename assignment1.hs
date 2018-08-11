@@ -1,84 +1,139 @@
+-- objective: rainbow table
+-- 1) need the hashfunction that the system uses
+-- 2) reduce fucntion : map the has value to arbiturary password() does not reverse the hashfunction
+-- Faraz Fazlalizadeh
+-- Cmpt 383
+-- A1
+
+
+
 import RainbowAssign
 import System.Random
 import Data.Int
 import Data.List
 import qualified Data.Map as Map
+import Data.Maybe as Maybe
 
+
+-- type Hash = Int32
+-- type Passwd = String
 pwLength, nLetters, width, height :: Int
 filename :: FilePath
-pwLength = 8            -- length of each password
-nLetters = 5            -- number of letters to use in passwords: 5 -> a-e
+pwLength = 8          -- length of each password
+nLetters = 5           -- number of letters to use in passwords: 5 -> a-e
 width = 40              -- length of each chain in the table
 height = 1000           -- number of "rows" in the table
 filename = "table.txt"  -- filename to store the table
 
-toInt :: Int32 -> Int
-toInt x = fromIntegral(x)
 
-toString :: [Int] -> [Char]
+
+-- used for conversion 
+int32toInt:: Int32 -> Int
+int32toInt x = fromIntegral(x)
+
+-- for reducing the paswd
+pwReduce:: Int32 -> String
+pwReduce x = 
+    (toString (reverse (take pwLength  (toBase (int32toInt(x))))))
+
+-- helper in pwReduce
+toString:: [Int] -> [Char]
 toString xs = map toLetter xs
 
-convertBase :: Int -> [Int]
-convertBase x = (take pwLength $ (x `mod` nLetters) : convertBase (x `div` nLetters))
 
-pwReduce:: Int32 -> String
-pwReduce x = toString (reverse (take pwLength (convertBase (toInt(x)))))
+--  for dealing with negative
+toBase :: Int -> [ Int ]
+toBase x  = (take pwLength $ (x `mod` nLetters) : toBase (x `div` nLetters) )
 
--- Functions to calculate the rainbowTable
+
+
+--RainbowTable recursive function to calculate final hash
 rainbowTableRecursive :: Int -> Passwd -> Hash
 rainbowTableRecursive 0 y = pwHash (y)
 rainbowTableRecursive x y = rainbowTableRecursive (x-1) (pwReduce $! (pwHash (y)))
 
+
+
+--RainbowTable function to map Passwd list to a recursive hash calculator
 rainbowTable :: Int -> [Passwd] -> Map.Map Hash Passwd
 rainbowTable x [] = Map.fromList [(0, "")]
-rainbowTable 0 (y:ys) = Map.fromList (map rainbowMappingBaseCase (y:ys))
-    where rainbowMappingBaseCase y = (pwHash y, y)
-rainbowTable x (y:ys) = Map.fromList (map rainbowMapping (y:ys))
-    where rainbowMapping y = (rainbowTableRecursive x y, y)
+rainbowTable 0 (w:ws) = Map.fromList (map baseFor0 (w:ws))
+    where baseFor0 w = (pwHash w, w)
+rainbowTable x (w:ws) = Map.fromList (map rainbowMappingForNon0 (w:ws))
+    where rainbowMappingForNon0 w = (rainbowTableRecursive x w, w)
 
--- Functions for testing
 generateTable :: IO ()
 generateTable = do
-    table <- buildTable rainbowTable nLetters pwLength width height
-    writeTable table filename
+  table <- buildTable rainbowTable nLetters pwLength width height
+  writeTable table filename
+
 
 test1 = do
-    table <- readTable filename
-    return (Map.lookup 0 table)
+  table <- readTable filename
+  return (Map.lookup 0 table)
 
--- Function to understand last required function from assignment as the web page instructions are very poorly written. 
--- Hard to understand what you guys actually want as it is very obscure.
-loopHashReduce :: Passwd -> Int -> Passwd
-loopHashReduce x 0 = x
-loopHashReduce x y
-    | (pwHash x) == (19040862) = x
-    | otherwise = loopHashReduce (pwReduce (pwHash x)) (y-1)
 
---Functions to calculate the final function
-changePasswdInList :: Hash -> Passwd -> (Hash, Passwd)
-changePasswdInList hash newPasswd = (hash, newPasswd)
 
-searchWidthCurrentPasswd :: (Hash, Passwd) -> Int -> Hash -> (Hash, Passwd)
-searchWidthCurrentPasswd x y z
-    | (pwHash (snd (x))) == z = x
-    | y == 0 = x
-    | otherwise = searchWidthCurrentPasswd
-        (changePasswdInList (fst x) (pwReduce (pwHash (snd (x)))))
-        (y-1)
-        z
+fromJust :: Maybe Int -> Int
+fromJust x = Main.fromJust x
 
-findPasswordRecursive :: [(Hash, Passwd)] -> Int -> Hash -> Maybe Passwd
-findPasswordRecursive (x:xs) 0 z 
-    | (pwHash (snd x)) == z = Just (snd (x))
-    | length xs == 0 = Nothing
-    | otherwise = findPasswordRecursive xs 0 z
+isJust :: Maybe Passwd -> Bool
+isJust x = Main.isJust x
 
-findPasswordRecursive (x:xs) y z
-    | (pwHash (snd(searchWidthCurrentPasswd x y z))) == z = Just (snd (searchWidthCurrentPasswd x y z))
-    | length xs == 0 = Nothing
-    | otherwise = findPasswordRecursive xs y z
 
+
+
+-- helper fucntions incase needed
+
+  -- make tuple
+makePassAndHashTuple :: Hash -> Passwd -> (Hash, Passwd)
+makePassAndHashTuple hash givenPass = (hash, givenPass)
+
+
+makeNewPaswd :: (Hash, Passwd) -> Passwd
+makeNewPaswd givenTuple = pwReduce (pwHash (snd givenTuple))
+
+
+findTheIndexOfGivenElement :: [(Hash, Passwd)] -> Hash -> Int
+findTheIndexOfGivenElement ws x = Maybe.fromJust (x `elemIndex` (map fst (ws)))       
+
+searchRecur :: (Hash, Passwd) -> Hash -> Int -> Maybe Passwd
+searchRecur givenTuple hashVal counter
+    | ((pwHash (snd givenTuple)) == hashVal) = Just (snd givenTuple)
+    | (counter == 0) = Nothing
+    | otherwise = searchRecur 
+        (makePassAndHashTuple (fst givenTuple) (makeNewPaswd givenTuple))
+        hashVal
+        (counter-1)
+
+falsePosCheck :: Map.Map Hash Passwd -> Int -> Int -> Int -> Hash -> Hash -> Hash -> Maybe Passwd
+falsePosCheck ws countNotFalse countCopy counterOriginal hashEdit hashVal hashFalse
+    | (Maybe.isJust checkFunction) = checkFunction
+    | (Maybe.isNothing checkFunction) = findPaswdRecur ws (counterOriginal-1) countCopy (pwHash (pwReduce (hashEdit))) hashFalse
+        where checkFunction = searchRecur ((Map.toList ws)!!(findTheIndexOfGivenElement (Map.toList ws) hashEdit)) hashVal countNotFalse
+
+-- gets the table...amount of times its been hashed.. hashvalue
 findPassword :: Map.Map Hash Passwd -> Int -> Hash -> Maybe Passwd
-findPassword xs 0 z = findPasswordRecursive (Map.toList (xs)) 0 z
-findPassword xs y 0 = Nothing
-findPassword xs y z = findPasswordRecursive (Map.toList (xs)) y z 
+findPassword ws 0 hashVal = (Map.lookup hashVal ws)
+findPassword ws y 0 = Nothing
+findPassword ws y hashVal = findPaswdRecur ws y y hashVal hashVal
+
+
+findPaswdRecur :: Map.Map Hash Passwd -> Int -> Int -> Hash -> Hash  -> Maybe Passwd
+findPaswdRecur ws counterCounting counterCopy hashEdit hashVal
+    | (Maybe.isJust (Map.lookup hashEdit ws)) = falsePosCheck ws counterCopy counterCopy counterCounting hashEdit hashVal hashVal 
+    | (counterCounting <= 0) = Nothing 
+    | otherwise = findPaswdRecur 
+        ws 
+        (counterCounting-1) 
+        counterCopy
+        (pwHash (pwReduce hashEdit)) 
+        hashVal
+
+test2 :: Int -> IO ([Passwd], Int)
+test2 n = do
+    table <- readTable filename
+    pws <- randomPasswords nLetters pwLength n
+    let hs = map pwHash pws
+    let result = Maybe.mapMaybe (findPassword table width) hs
+    return (result, length result)
