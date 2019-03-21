@@ -1,30 +1,26 @@
-# RainbowTable
+# Rainbow Table Assignment 
+
+RainbowAssign.hs was provided by the proffessor (GB). This was an assignment for CMPT 383. The project goal was to reverse a set of hash functions in order to decipher there corresponding passwords.
 
 
-RanbowAssign provided by cmpt 383 prof (GB)
+## Important Functions:
+  1) pwHash: Converts a string (pswd) into a hash value
+  2) pwReduce: Converts a hash value to possible pswd
 
-Main Idea: reversing some hash functions and figure out the corresponding passwords
 
-
-Important Functions:
-  1) pwHash: convert string (pswd) to a hash value
-  2) pwReduce: convert hash value to possible pswd
-
-How to load 
-  1) open ghci
-  2) :c where ever you save the files
-  3) :l assignment1.hs
-  
-
-  4) creating table:
+## Steps to load 
+  1) Open ghci
+  2) Use ':c' at the location of your saved files
+  3) Use ':l assignment1.hs'
+  4) Creating a table:
   *Main> :t rainbowTable
     rainbowTable :: Int -> [Passwd] -> Map.Map Hash Passwd
   *Main> rainbowTable 2 ["dccdecee","cdeccaed","acbcaeec","eeeeaebd","ccdccbeb"]
  
-   or simpler -> just call generateTable
+   Alternatively, to create a table you can call the 'generateTable' function.
    
    
-   some Examples:
+## Examples:
    
    *Main> let table = rainbowTable 40 ["abcdeabc", "aabbccdd", "eeeeeeee"]
    *Main> findPassword table 40 1726491528
